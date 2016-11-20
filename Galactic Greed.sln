@@ -1,0 +1,23 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2008
+
+Project("{5A6CBAB4-7124-1503-E6DF-50D30083338F}") = "Galactic Greed", "Assembly-CSharp.csproj", "{76C449E6-1BFA-087D-B2CA-E7EBD6E20159}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{76C449E6-1BFA-087D-B2CA-E7EBD6E20159}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{76C449E6-1BFA-087D-B2CA-E7EBD6E20159}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{76C449E6-1BFA-087D-B2CA-E7EBD6E20159}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{76C449E6-1BFA-087D-B2CA-E7EBD6E20159}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(MonoDevelopProperties) = preSolution
+		StartupItem = Assembly-CSharp.csproj
+	EndGlobalSection
+EndGlobal
