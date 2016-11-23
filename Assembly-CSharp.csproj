@@ -47,6 +47,7 @@
   <ItemGroup>
      <Compile Include="Assets\Scripts\BorderController.cs" />
      <Compile Include="Assets\Scripts\ButtonHold.cs" />
+     <Compile Include="Assets\Scripts\ClientController.cs" />
      <Compile Include="Assets\Scripts\Factory.cs" />
      <Compile Include="Assets\Scripts\GameController.cs" />
      <Compile Include="Assets\Scripts\InputController.cs" />
