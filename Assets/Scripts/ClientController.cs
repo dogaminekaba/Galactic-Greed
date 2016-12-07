@@ -1,79 +1,59 @@
-﻿using System.Collections;
-using System;
-using System.Net;
+﻿using System;
+using System.Collections;
 using System.Net.Sockets;
-using System.Threading;
-using System.Text;
 using UnityEngine;
+using System.Threading;
 
 public class ClientController : MonoBehaviour {
+    
+    static public bool programEnded = false;
+    static protected bool connectedToServer = false;
+    public GameObject connectionErrorUI;
     public GameObject usersShip;
-
+    private Vector3 usersPosition;
     private Client user;
+    private Thread thSendPosition;
 
-	// Use this for initialization
-	void Start () {
+    // Use this for initialization
+    void Start () {
         user = new Client();
         user.connect();
-	}
-	
-	// Update is called once per frame
-	void Update () {
-        user.sendData(  "x: " + usersShip.transform.position.x + 
-                        " y: " + usersShip.transform.position.y);
-	}
-
-
-}
-
-public class Client
-{
-    private const int transferDataSize = 1024;
-    private const int PORT_NO = 8080;
-    private const string SERVER_IP = "127.0.0.1";
-    private bool programEnded = false;
-
-    //---create a TCPClient object at the IP and port no.---
-    private TcpClient clientSocket = new TcpClient();
-    private NetworkStream serverStream;
-
-    public void connect()
-    {
-        try
-        {
-            // Handle exit signal to let server know that client is left
-            AppDomain.CurrentDomain.ProcessExit += new EventHandler(OnProcessExit);
-
-            clientSocket.Connect("127.0.0.1", 8080);
-        }
-        catch(Exception e)
-        {
-            displayMessage(e.Message);
-        }
+        thSendPosition = new Thread(sendPosition);
     }
 
-    public void sendData(string data)
+    void sendPosition()
     {
-        byte[] outStream;
-        if (programEnded)
+        while (!programEnded)
         {
-            serverStream = clientSocket.GetStream();
-            outStream = System.Text.Encoding.ASCII.GetBytes("I died <EOF>");
-            serverStream.Write(outStream, 0, outStream.Length);
-            serverStream.Flush();
-            clientSocket.Close();
-            return;
+            if (connectedToServer)
+                user.sendData("x: " + usersPosition.x + " y: " + usersPosition.y);
         }
-        serverStream = clientSocket.GetStream();
-        outStream = System.Text.Encoding.ASCII.GetBytes(data + "<EOF>");
-        serverStream.Write(outStream, 0, outStream.Length);
-        serverStream.Flush();
+        
+        // user closes the application
+        user.informServer();
+        user.informServer();
 
-        byte[] inStream = new byte[transferDataSize];
-        serverStream.Read(inStream, 0, transferDataSize);
-        string returndata = System.Text.Encoding.ASCII.GetString(inStream);
-        returndata = returndata.Substring(0, returndata.IndexOf("<EOF>"));
-        displayMessage("Data from Server : " + returndata);
+    }
+	
+	// Update is called once per frame
+	void FixedUpdate () {
+        usersPosition = usersShip.transform.position;
+        if(!programEnded && connectedToServer)
+        {
+            removeConnectionUI();
+            thSendPosition.Start();
+            InputController.gamePaused = false;
+        }
+        else if(!connectedToServer)
+        {
+            displayConnectionUI();
+            InputController.gamePaused = true;
+        }
+	}
+
+    public void connectServer()
+    {
+        user.connect();
     }
 
     private void OnProcessExit(object sender, EventArgs e)
@@ -81,8 +61,93 @@ public class Client
         programEnded = true;
     }
 
-    private void displayMessage(string msg)
+    private void displayConnectionUI()
     {
-        Debug.Log(msg);
-    } 
+        if (!connectionErrorUI.activeInHierarchy)
+            connectionErrorUI.SetActive(true);
+    }
+
+    private void removeConnectionUI()
+    {
+        if (connectionErrorUI.activeInHierarchy)
+            connectionErrorUI.SetActive(false);
+    }
+
+    public class Client
+    {
+        private const int PORT_NO = 8080;
+        private const string SERVER_IP = "192.168.1.108";
+        private const int transferDataSize = 1024;
+
+        //---create a TCPClient object at the IP and port no.---
+        private TcpClient clientSocket = new TcpClient();
+        private NetworkStream serverStream;
+
+        public void connect()
+        {
+            try
+            {
+                clientSocket.Connect(SERVER_IP, PORT_NO);
+                connectedToServer = true;
+            }
+            catch (Exception e)
+            {
+                displayMessage(e.Message);
+                connectedToServer = false;
+            }
+        }
+
+        public void sendData(string data)
+        {
+            try
+            {
+                byte[] outStream;
+                byte[] inStream;
+                string returndata;
+
+                serverStream = clientSocket.GetStream();
+                outStream = System.Text.Encoding.ASCII.GetBytes(data + "<EOF>");
+                serverStream.Write(outStream, 0, outStream.Length);
+                serverStream.Flush();
+
+                inStream = new byte[transferDataSize];
+                serverStream.Read(inStream, 0, transferDataSize);
+                returndata = System.Text.Encoding.ASCII.GetString(inStream);
+                returndata = returndata.Substring(0, returndata.IndexOf("<EOF>"));
+                displayMessage("Data from Server : " + returndata);
+            }
+            catch (Exception e)
+            {
+                connectedToServer = false;
+                displayMessage(e.Message);
+            }
+        }
+
+        public void informServer()
+        {
+            byte[] outStream;
+            byte[] inStream;
+            string returndata;
+
+            serverStream = clientSocket.GetStream();
+            outStream = System.Text.Encoding.ASCII.GetBytes("I died <EOF>");
+            serverStream.Write(outStream, 0, outStream.Length);
+            serverStream.Flush();
+
+            inStream = new byte[transferDataSize];
+            serverStream.Read(inStream, 0, transferDataSize);
+            returndata = System.Text.Encoding.ASCII.GetString(inStream);
+            returndata = returndata.Substring(0, returndata.IndexOf("<EOF>"));
+            displayMessage("Data from Server : " + returndata);
+            return;
+        }
+
+        private void displayMessage(string msg)
+        {
+            Debug.Log(msg);
+        }
+    }
+
 }
+
+
