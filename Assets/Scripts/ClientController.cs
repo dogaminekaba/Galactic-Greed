@@ -1,48 +1,48 @@
 ﻿using System;
-using System.Collections;
 using System.Net.Sockets;
 using UnityEngine;
 using System.Threading;
+using UnityEngine.UI;
 
 public class ClientController : MonoBehaviour {
     
     static public bool programEnded = false;
-    static protected bool connectedToServer = false;
+
+    static public bool connectedToServer = false;
+    static protected bool signedUp = false;
+
     public GameObject connectionErrorUI;
+    public GameObject logInUI;
     public GameObject usersShip;
+
     private Vector3 usersPosition;
     private Client user;
-    private Thread thSendPosition;
+    private Thread thSendStatus;
+
+    [SerializeField]
+    private InputField userNameInput;
+    [SerializeField]
+    private InputField passwordInput;
 
     // Use this for initialization
     void Start () {
         user = new Client();
         user.connect();
-        thSendPosition = new Thread(sendPosition);
+        //thSendStatus = new Thread(sendStatus);
     }
 
-    void sendPosition()
-    {
-        while (!programEnded)
-        {
-            if (connectedToServer)
-                user.sendData("x: " + usersPosition.x + " y: " + usersPosition.y);
-        }
-        
-        // user closes the application
-        user.informServer();
-        user.informServer();
-
-    }
-	
 	// Update is called once per frame
 	void FixedUpdate () {
+
+        if (signedUp)
+            logInUI.SetActive(false);
+
         usersPosition = usersShip.transform.position;
         if(!programEnded && connectedToServer)
         {
             removeConnectionUI();
-            thSendPosition.Start();
-            InputController.gamePaused = false;
+            if(!logInUI.active)
+                InputController.gamePaused = false;
         }
         else if(!connectedToServer)
         {
@@ -50,6 +50,40 @@ public class ClientController : MonoBehaviour {
             InputController.gamePaused = true;
         }
 	}
+
+    public void signUp()
+    {
+        String username = userNameInput.text;
+        String password = passwordInput.text;
+
+        if (connectedToServer)
+        {
+            Debug.Log("*signup* username: " + username + " password: " + password);
+            user.sendData("*signup*username:" + username + "password:" + password);
+
+        }
+        // not connected to server, try to connect again
+        else
+        {
+            displayConnectionUI();
+            connectedToServer = false;
+            InputController.gamePaused = true;
+        }
+    }
+
+    void sendStatus()
+    {
+        while (!programEnded)
+        {
+            if (connectedToServer)
+                user.sendData("*position*x:" + usersPosition.x + "y:" + usersPosition.y);
+        }
+
+        // user closes the application
+        user.informServer();
+        user.informServer();
+
+    }
 
     public void connectServer()
     {
@@ -113,7 +147,13 @@ public class ClientController : MonoBehaviour {
                 inStream = new byte[transferDataSize];
                 serverStream.Read(inStream, 0, transferDataSize);
                 returndata = System.Text.Encoding.ASCII.GetString(inStream);
+
+                //TO-DO add function here
                 returndata = returndata.Substring(0, returndata.IndexOf("<EOF>"));
+                
+                if(returndata.IndexOf("*signupsucceed*") > -1)
+                    signedUp = true;
+                
                 displayMessage("Data from Server : " + returndata);
             }
             catch (Exception e)

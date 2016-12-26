@@ -27,7 +27,7 @@ public class InputController : MonoBehaviour {
 
     private Factory fac;
 
-    private bool DEBUG_CODE = false;
+    private bool DEBUG_CODE = true;
 
     // Use this for initialization
     void Start () {
@@ -37,7 +37,7 @@ public class InputController : MonoBehaviour {
         yMax = height / 3;
         rigidbody = usersShip.GetComponent<Rigidbody>();
         fac = GetComponent<Factory>();
-        gamePaused = false;
+        gamePaused = true;
         shotSpeed = 400 * speed;
         Input.gyro.enabled = true;
 	}
@@ -49,9 +49,9 @@ public class InputController : MonoBehaviour {
 
     void OnApplicationQuit()
     {
-        Debug.Log("finished.");
         ClientController.programEnded = true;
         Thread.Sleep(500);
+        Debug.Log("finished.");
     }
 
     private void movePlayer()
