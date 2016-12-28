@@ -7,9 +7,10 @@ using UnityEngine.UI;
 public class ClientController : MonoBehaviour {
     
     static public bool programEnded = false;
-
     static public bool connectedToServer = false;
+
     static protected bool signedUp = false;
+    static protected Thread thSendStatus;
 
     public GameObject connectionErrorUI;
     public GameObject logInUI;
@@ -17,8 +18,9 @@ public class ClientController : MonoBehaviour {
 
     private Vector3 usersPosition;
     private Client user;
-    private Thread thSendStatus;
 
+    [SerializeField]
+    private InputField emailInput;
     [SerializeField]
     private InputField userNameInput;
     [SerializeField]
@@ -28,50 +30,73 @@ public class ClientController : MonoBehaviour {
     void Start () {
         user = new Client();
         user.connect();
-        //thSendStatus = new Thread(sendStatus);
+        thSendStatus = new Thread(sendStatus);
+        thSendStatus.Start();
     }
 
 	// Update is called once per frame
-	void FixedUpdate () {
-
-        if (signedUp)
-            logInUI.SetActive(false);
-
+	void Update () {
         usersPosition = usersShip.transform.position;
-        if(!programEnded && connectedToServer)
-        {
-            removeConnectionUI();
-            if(!logInUI.active)
-                InputController.gamePaused = false;
-        }
-        else if(!connectedToServer)
-        {
-            displayConnectionUI();
-            InputController.gamePaused = true;
-        }
+        if (!connectedToServer)
+            disconnected();
 	}
 
     public void signUp()
     {
+        String email = emailInput.text;
         String username = userNameInput.text;
         String password = passwordInput.text;
+        bool emailOutOfSize = false;
+        bool usernameOutOfSize = false;
+        bool passwordOutOfSize = false;
+        bool outOfMailFormat = false;
+
+        if (email.Length < 1 || email.Length > 50)
+            emailOutOfSize = true;
+
+        if (username.Length < 1 || username.Length > 20)
+            usernameOutOfSize = true;
+
+        if (password.Length < 1 || password.Length > 20)
+            passwordOutOfSize = true;
+
+        if(!emailOutOfSize && email.IndexOf("@") < 0)
+            outOfMailFormat = true;
+
+        if(outOfMailFormat)
+        {
+            emailInput.text = "";
+            emailInput.placeholder.GetComponent<Text>().text = "invalid mail";
+        }
+        if (emailOutOfSize)
+        {
+            emailInput.text = "";
+            emailInput.placeholder.GetComponent<Text>().text = "mail (1-50)";
+        }
+        if (usernameOutOfSize)
+        {
+            userNameInput.text = "";
+            userNameInput.placeholder.GetComponent<Text>().text = "username (1-20)";
+        }
+        if (passwordOutOfSize)
+        {
+            passwordInput.text = "";
+            passwordInput.placeholder.GetComponent<Text>().text = "password (1-20)";
+        }
 
         if (connectedToServer)
         {
-            Debug.Log("*signup* username: " + username + " password: " + password);
-            user.sendData("*signup*username:" + username + "password:" + password);
+            Debug.Log("*signup* email: " + email + " username: " + username + " password: " + password);
 
+            if (!emailOutOfSize && !outOfMailFormat && !usernameOutOfSize && !passwordOutOfSize)
+                user.sendData("*signup*email:" + email + "username:" + username + "password:" + password);
         }
         // not connected to server, try to connect again
         else
-        {
-            displayConnectionUI();
-            connectedToServer = false;
-            InputController.gamePaused = true;
-        }
+            disconnected();
     }
 
-    void sendStatus()
+    public void sendStatus()
     {
         while (!programEnded)
         {
@@ -90,27 +115,30 @@ public class ClientController : MonoBehaviour {
         user.connect();
     }
 
+    static public void disconnected()
+    {
+        if(GameController.currentState != GameController.GameState.SERVER_CONNECTION_ERROR)
+            GameController.prevState = GameController.currentState;
+        GameController.currentState = GameController.GameState.SERVER_CONNECTION_ERROR;
+        connectedToServer = false;
+        InputController.gamePaused = true;
+    }
+
+    static public void connected()
+    {
+        GameController.currentState = GameController.prevState;
+        connectedToServer = true;
+    }
+
     private void OnProcessExit(object sender, EventArgs e)
     {
         programEnded = true;
     }
 
-    private void displayConnectionUI()
-    {
-        if (!connectionErrorUI.activeInHierarchy)
-            connectionErrorUI.SetActive(true);
-    }
-
-    private void removeConnectionUI()
-    {
-        if (connectionErrorUI.activeInHierarchy)
-            connectionErrorUI.SetActive(false);
-    }
-
     public class Client
     {
         private const int PORT_NO = 8080;
-        private const string SERVER_IP = "192.168.1.108";
+        private const string SERVER_IP = "10.1.18.16";
         private const int transferDataSize = 1024;
 
         //---create a TCPClient object at the IP and port no.---
@@ -122,12 +150,12 @@ public class ClientController : MonoBehaviour {
             try
             {
                 clientSocket.Connect(SERVER_IP, PORT_NO);
-                connectedToServer = true;
+                ClientController.connected();
             }
             catch (Exception e)
             {
                 displayMessage(e.Message);
-                connectedToServer = false;
+                ClientController.disconnected();
             }
         }
 
@@ -158,8 +186,8 @@ public class ClientController : MonoBehaviour {
             }
             catch (Exception e)
             {
-                connectedToServer = false;
                 displayMessage(e.Message);
+                ClientController.disconnected();
             }
         }
 

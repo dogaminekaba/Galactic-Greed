@@ -37,7 +37,7 @@ public class InputController : MonoBehaviour {
         yMax = height / 3;
         rigidbody = usersShip.GetComponent<Rigidbody>();
         fac = GetComponent<Factory>();
-        gamePaused = true;
+        gamePaused = false;
         shotSpeed = 400 * speed;
         Input.gyro.enabled = true;
 	}
@@ -72,7 +72,7 @@ public class InputController : MonoBehaviour {
 
                 // Create the shot
                 GameObject shot = fac.createShot();
-                shot.transform.position = usersShip.transform.position;
+                shot.transform.position = new Vector3(usersShip.transform.position.x, usersShip.transform.position.y, usersShip.transform.position.z + 0.05f);
                 shot.transform.rotation = usersShip.transform.rotation;
                 float velShotX = shotSpeed * Time.deltaTime * Mathf.Sin(shipRotationZ * Mathf.Deg2Rad);
                 float velShotY = shotSpeed * Time.deltaTime * Mathf.Cos(shipRotationZ * Mathf.Deg2Rad);
@@ -135,6 +135,5 @@ public class InputController : MonoBehaviour {
             cam.transform.rotation = usersShip.transform.rotation;
         }
     }
-
 
 }

@@ -10,7 +10,7 @@ public class Factory : MonoBehaviour {
     {
         if (shotPrefab == null)
             return null;
-        return (GameObject)Instantiate(shotPrefab, new Vector3(0, 0, -0.5f), Quaternion.identity);
+        return Instantiate(shotPrefab);
     }
 
 }

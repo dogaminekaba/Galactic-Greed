@@ -10,6 +10,7 @@ public class GameController : MonoBehaviour {
     public GameObject pauseUI;
     public GameObject inGameUI;
     public static GameState currentState;
+    public static GameState prevState;
 
     public enum GameState
     {
@@ -23,6 +24,7 @@ public class GameController : MonoBehaviour {
 
     void Start () {
         currentState = GameState.GAME_PLAY;
+        prevState = currentState;
 	}
 	
 	void FixedUpdate () {
@@ -36,6 +38,7 @@ public class GameController : MonoBehaviour {
                 connectionErrorUI.SetActive(false);
                 inGameUI.SetActive(false);
                 startUI.SetActive(true);
+                InputController.gamePaused = true;
                 break;
 
             case GameState.SERVER_CONNECTION_ERROR:
@@ -54,6 +57,7 @@ public class GameController : MonoBehaviour {
                 connectionErrorUI.SetActive(false);
                 inGameUI.SetActive(false);
                 pauseUI.SetActive(true);
+                InputController.gamePaused = true;
                 break;
 
             case GameState.LOG_IN:
@@ -63,6 +67,7 @@ public class GameController : MonoBehaviour {
                 pauseUI.SetActive(false);
                 inGameUI.SetActive(false);
                 logInUI.SetActive(true);
+                InputController.gamePaused = true;
                 break;
 
             case GameState.SIGN_UP:
@@ -72,6 +77,7 @@ public class GameController : MonoBehaviour {
                 pauseUI.SetActive(false);
                 inGameUI.SetActive(false);
                 signUpUI.SetActive(true);
+                InputController.gamePaused = true;
                 break;
 
             case GameState.GAME_PLAY:
@@ -81,6 +87,7 @@ public class GameController : MonoBehaviour {
                 connectionErrorUI.SetActive(false);
                 pauseUI.SetActive(false);
                 inGameUI.SetActive(true);
+                InputController.gamePaused = false;
                 break;
 
             default:
