@@ -64,9 +64,6 @@ public class InputController : MonoBehaviour {
             // Shooting
             if (Input.GetMouseButtonUp(0))
             {
-                float mouseScreenX = Input.mousePosition.x;
-                float mouseScreenY = Input.mousePosition.y;
-
                 float userScreenX = cam.WorldToScreenPoint(usersShip.transform.position).x;
                 float userScreenY = cam.WorldToScreenPoint(usersShip.transform.position).y;
 

@@ -101,7 +101,7 @@ public class ClientController : MonoBehaviour {
         while (!programEnded)
         {
             if (connectedToServer)
-                user.sendData("*position*x:" + usersPosition.x + "y:" + usersPosition.y);
+                user.sendData("*info*x:" + usersPosition.x + "y:" + usersPosition.y);
         }
 
         // user closes the application
@@ -138,7 +138,7 @@ public class ClientController : MonoBehaviour {
     public class Client
     {
         private const int PORT_NO = 8080;
-        private const string SERVER_IP = "10.1.18.16";
+        private const string SERVER_IP = "172.20.10.3";
         private const int transferDataSize = 1024;
 
         //---create a TCPClient object at the IP and port no.---
@@ -165,7 +165,7 @@ public class ClientController : MonoBehaviour {
             {
                 byte[] outStream;
                 byte[] inStream;
-                string returndata;
+                string returndata = "";
 
                 serverStream = clientSocket.GetStream();
                 outStream = System.Text.Encoding.ASCII.GetBytes(data + "<EOF>");
@@ -182,7 +182,7 @@ public class ClientController : MonoBehaviour {
                 if(returndata.IndexOf("*signupsucceed*") > -1)
                     signedUp = true;
                 
-                displayMessage("Data from Server : " + returndata);
+                Debug.Log("Data from Server : " + returndata);
             }
             catch (Exception e)
             {
