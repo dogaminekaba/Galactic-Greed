@@ -1,13 +1,19 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Threading;
+using System;
 
 public class InputController : MonoBehaviour {
 
-    static public bool gamePaused;
+    public static bool gamePaused;
+    public static float shipRotationZ;
+    public static bool shotFire = false;
+    public static Factory fac;
 
     [SerializeField] 
     private GameObject usersShip;
+    [SerializeField]
+    private GameObject [] enemyShips;
     [SerializeField]
     private Camera cam;
     [SerializeField]
@@ -19,24 +25,28 @@ public class InputController : MonoBehaviour {
     private float shotSpeed;
 
     private float xMax, xMin, yMax, yMin;
-    private float shipRotationZ;
-    private Rigidbody rigidbody;
 
     private float userPosX = 0;
     private float userPosY = 0;
 
-    private Factory fac;
-
+    // input flag
     private bool DEBUG_CODE = true;
 
     // Use this for initialization
     void Start () {
+        fac = GetComponent<Factory>();
+
+        enemyShips = new GameObject[ClientController.serverSize];
+        for (int i = 0; i < ClientController.serverSize; ++i)
+        {
+            enemyShips[i] = fac.createEnemy();
+            enemyShips[i].SetActive(false);
+        }
+
         xMin = -width * 2.0f / 5;
         xMax = width * 2.0f / 5;
         yMin = -height / 3;
         yMax = height / 3;
-        rigidbody = usersShip.GetComponent<Rigidbody>();
-        fac = GetComponent<Factory>();
         gamePaused = false;
         shotSpeed = 400 * speed;
         Input.gyro.enabled = true;
@@ -45,7 +55,42 @@ public class InputController : MonoBehaviour {
 	// Update is called once per frame
 	void Update () {
         movePlayer();
+        showOthers();
 	}
+
+    private void showOthers()
+    {
+        if (ClientController.listLock.WaitOne(15))
+        {
+            for (int i = 0; i < ClientController.serverSize; ++i)
+            {
+                if(ClientController.infoList[i].hold)
+                {
+
+                    enemyShips[i].transform.position = new Vector3( ClientController.infoList[i].x,
+                                                                    ClientController.infoList[i].y,
+                                                                    usersShip.transform.position.z);
+                    enemyShips[i].transform.rotation = Quaternion.identity;
+                    enemyShips[i].transform.Rotate(Vector3.forward, ClientController.infoList[i].theta);
+                    enemyShips[i].SetActive(true);
+                    if(ClientController.infoList[i].shotFired)
+                    {
+                        // Create the shot
+                        GameObject shot = fac.createShot();
+                        shot.transform.position = new Vector3(enemyShips[i].transform.position.x, enemyShips[i].transform.position.y, enemyShips[i].transform.position.z + 0.05f);
+                        shot.transform.rotation = enemyShips[i].transform.rotation;
+                        float velShotX = shotSpeed * Time.deltaTime * Mathf.Sin(ClientController.infoList[i].theta * Mathf.Deg2Rad);
+                        float velShotY = shotSpeed * Time.deltaTime * Mathf.Cos(ClientController.infoList[i].theta * Mathf.Deg2Rad);
+                        shot.tag = "Enemy Shot";
+                        shot.GetComponent<Rigidbody>().velocity = new Vector3(velShotX, velShotY, 0);
+                    }
+                }
+                else
+                    enemyShips[i].SetActive(false);
+            }
+            ClientController.listLock.ReleaseMutex();
+        }
+    }
 
     void OnApplicationQuit()
     {
@@ -64,17 +109,15 @@ public class InputController : MonoBehaviour {
             // Shooting
             if (Input.GetMouseButtonUp(0))
             {
-                float userScreenX = cam.WorldToScreenPoint(usersShip.transform.position).x;
-                float userScreenY = cam.WorldToScreenPoint(usersShip.transform.position).y;
-
                 // Create the shot
                 GameObject shot = fac.createShot();
                 shot.transform.position = new Vector3(usersShip.transform.position.x, usersShip.transform.position.y, usersShip.transform.position.z + 0.05f);
                 shot.transform.rotation = usersShip.transform.rotation;
                 float velShotX = shotSpeed * Time.deltaTime * Mathf.Sin(shipRotationZ * Mathf.Deg2Rad);
                 float velShotY = shotSpeed * Time.deltaTime * Mathf.Cos(shipRotationZ * Mathf.Deg2Rad);
+                shot.tag = "Player Shot";
                 shot.GetComponent<Rigidbody>().velocity = new Vector3(velShotX, velShotY, 0);
-
+                shotFire = true;
             }
 
             // Player move //

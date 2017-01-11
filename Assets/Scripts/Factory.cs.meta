@@ -1,11 +1,14 @@
 fileFormatVersion: 2
 guid: 71f32901d1c12624a8908e1f1b025f79
-timeCreated: 1479667045
+timeCreated: 1484100291
 licenseType: Free
 MonoImporter:
   serializedVersion: 2
   defaultReferences:
   - shotPrefab: {fileID: 166870, guid: 28227310512e3bd46ad6ce3cbf8abd3e, type: 2}
+  - enemyPrefab: {fileID: 1463871741983100, guid: b714561ca394cd0408db22067457b05d,
+      type: 2}
+  - explosionPrefab: {fileID: 100008, guid: a93496017806b7740910df5fd946f306, type: 2}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

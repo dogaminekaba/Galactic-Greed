@@ -3,14 +3,36 @@ using System.Net.Sockets;
 using UnityEngine;
 using System.Threading;
 using UnityEngine.UI;
+using System.Globalization;
+
+public class Info
+{
+    public int clientID = -1;
+    public float x;
+    public float y;
+    public float theta;
+    public int color;
+    public bool shotFired;
+    public bool dead;
+    public bool hold = false;
+
+    public string toString()
+    {
+        return "id:" + clientID + "x:" + x + "y:" + y + "theta:" + theta + "color:" + color + "shotFired:" + shotFired + "dead:" + dead;
+    }
+}
 
 public class ClientController : MonoBehaviour {
-    
-    static public bool programEnded = false;
-    static public bool connectedToServer = false;
+
+    public static Mutex listLock;
+    public static bool programEnded = false;
+    public static bool connectedToServer = false;
+    public static Info[] infoList;
+    public static int serverSize = 20;
 
     static protected bool signedUp = false;
     static protected Thread thSendStatus;
+    static protected Info currentInfo;
 
     public GameObject connectionErrorUI;
     public GameObject logInUI;
@@ -28,17 +50,51 @@ public class ClientController : MonoBehaviour {
 
     // Use this for initialization
     void Start () {
+
+        listLock = new Mutex();
+
         user = new Client();
         user.connect();
+
+        // retrieve info and fill currentInfo
+        currentInfo = new Info();
+        currentInfo.color = 0;
+        currentInfo.dead = false;
+        currentInfo.hold = true;
+        currentInfo.theta = InputController.shipRotationZ;
+        currentInfo.shotFired = false;
+        currentInfo.x = usersPosition.x;
+        currentInfo.y = usersPosition.y;
+
+        infoList = new Info[serverSize];
+        for (int i = 0; i < serverSize; ++i)
+            infoList[i] = new Info();
+
         thSendStatus = new Thread(sendStatus);
         thSendStatus.Start();
+        signedUp = true;
     }
 
 	// Update is called once per frame
 	void Update () {
-        usersPosition = usersShip.transform.position;
-        if (!connectedToServer)
-            disconnected();
+        if (usersShip)
+        {
+            usersPosition = usersShip.transform.position;
+
+            currentInfo.theta = InputController.shipRotationZ;
+            currentInfo.x = usersPosition.x;
+            currentInfo.y = usersPosition.y;
+            if (InputController.shotFire)
+            {
+                currentInfo.shotFired = true;
+                InputController.shotFire = false;
+            }
+            else
+                currentInfo.shotFired = false;
+
+            if (!connectedToServer)
+                disconnected();
+        }
 	}
 
     public void signUp()
@@ -87,7 +143,8 @@ public class ClientController : MonoBehaviour {
         if (connectedToServer)
         {
             Debug.Log("*signup* email: " + email + " username: " + username + " password: " + password);
-
+            GameController.currentState = GameController.GameState.GAME_PLAY;
+            
             if (!emailOutOfSize && !outOfMailFormat && !usernameOutOfSize && !passwordOutOfSize)
                 user.sendData("*signup*email:" + email + "username:" + username + "password:" + password);
         }
@@ -100,14 +157,13 @@ public class ClientController : MonoBehaviour {
     {
         while (!programEnded)
         {
-            if (connectedToServer)
-                user.sendData("*info*x:" + usersPosition.x + "y:" + usersPosition.y);
+            if (connectedToServer && signedUp)
+                user.sendData("*info*" + currentInfo.toString());
         }
 
         // user closes the application
         user.informServer();
         user.informServer();
-
     }
 
     public void connectServer()
@@ -138,7 +194,8 @@ public class ClientController : MonoBehaviour {
     public class Client
     {
         private const int PORT_NO = 8080;
-        private const string SERVER_IP = "172.20.10.3";
+        //private const string SERVER_IP = "138.68.168.212";
+        private const string SERVER_IP = "192.168.1.108";
         private const int transferDataSize = 1024;
 
         //---create a TCPClient object at the IP and port no.---
@@ -154,7 +211,7 @@ public class ClientController : MonoBehaviour {
             }
             catch (Exception e)
             {
-                displayMessage(e.Message);
+                Debug.Log(e.Message);
                 ClientController.disconnected();
             }
         }
@@ -176,18 +233,130 @@ public class ClientController : MonoBehaviour {
                 serverStream.Read(inStream, 0, transferDataSize);
                 returndata = System.Text.Encoding.ASCII.GetString(inStream);
 
-                //TO-DO add function here
                 returndata = returndata.Substring(0, returndata.IndexOf("<EOF>"));
-                
-                if(returndata.IndexOf("*signupsucceed*") > -1)
+
+                if (returndata.IndexOf("*signupsucceed*") > -1)
+                {
                     signedUp = true;
-                
-                Debug.Log("Data from Server : " + returndata);
+                    // fetch user id here!
+
+                    thSendStatus.Start();
+                }
+                else if (returndata.IndexOf("*others*") > -1)
+                    parseOthersInfos(returndata);
+
             }
             catch (Exception e)
             {
-                displayMessage(e.Message);
+                Debug.Log(e.Message);
                 ClientController.disconnected();
+            }
+        }
+
+        private void parseOthersInfos(string othersInfos)
+        {
+            
+            int subStartIndex;
+            string xPos;
+            string yPos;
+            string theta;
+            string color;
+            string shotFire;
+            string dead;
+            string id;
+            string count;
+
+            int userCount = 0;
+
+            if (othersInfos.Length < 1)
+                return;
+
+            // connected user count
+            subStartIndex = othersInfos.IndexOf("userSize:") + "userSize:".Length;
+            count = othersInfos.Substring(subStartIndex);
+
+            if (count.IndexOf("id:") < 0)
+                userCount = 0;
+            else
+            {
+                count = count.Substring(0, count.IndexOf("id:"));
+                userCount = int.Parse(count);
+            }
+
+            if (listLock.WaitOne(10))
+            {
+                for (int i = 0; i < userCount; ++i)
+                {
+                     if (othersInfos.Length > 10)
+                     {
+                         infoList[i].hold = true;
+
+                         // id info
+                         subStartIndex = othersInfos.IndexOf("id:") + "id:".Length;
+                         id = othersInfos.Substring(subStartIndex);
+                         id = id.Substring(0, id.IndexOf("x:"));
+
+                         infoList[i].clientID = int.Parse(id);
+
+                         // x info
+                         subStartIndex = othersInfos.IndexOf("x:") + "x:".Length;
+                         xPos = othersInfos.Substring(subStartIndex);
+                         xPos = xPos.Substring(0, xPos.IndexOf("y:"));
+
+                         infoList[i].x = float.Parse(xPos, CultureInfo.InvariantCulture);
+
+                         // y info
+                         subStartIndex = othersInfos.IndexOf("y:") + "y:".Length;
+                         yPos = othersInfos.Substring(subStartIndex);
+                         yPos = yPos.Substring(0, yPos.IndexOf("theta:"));
+
+                         infoList[i].y = float.Parse(yPos, CultureInfo.InvariantCulture);
+
+                         // theta degree info
+                         subStartIndex = othersInfos.IndexOf("theta:") + "theta:".Length;
+                         theta = othersInfos.Substring(subStartIndex);
+                         theta = theta.Substring(0, theta.IndexOf("color:"));
+
+                         infoList[i].theta = float.Parse(theta, CultureInfo.InvariantCulture);
+
+                         // color info
+                         subStartIndex = othersInfos.IndexOf("color:") + "color:".Length;
+                         color = othersInfos.Substring(subStartIndex);
+                         color = color.Substring(0, color.IndexOf("shotFired:"));
+
+                         infoList[i].color = int.Parse(color);
+
+                         // shot fire info
+                         subStartIndex = othersInfos.IndexOf("shotFired:") + "shotFired:".Length;
+                         shotFire = othersInfos.Substring(subStartIndex);
+                         shotFire = shotFire.Substring(0, shotFire.IndexOf("dead:"));
+
+                         infoList[i].shotFired = bool.Parse(shotFire);
+
+                         // dead or alive info
+                         subStartIndex = othersInfos.IndexOf("dead:") + "dead:".Length;
+                         dead = othersInfos.Substring(subStartIndex);
+                         if(dead.IndexOf("id:") > 0)
+                            dead = dead.Substring(0, dead.IndexOf("id:"));
+
+                        infoList[i].dead = bool.Parse(dead);
+
+                         othersInfos = othersInfos.Substring(subStartIndex);
+                         subStartIndex = othersInfos.IndexOf("id:");
+
+                         if (subStartIndex >= 0)
+                             othersInfos = othersInfos.Substring(subStartIndex);
+                         else
+                             othersInfos = "";
+
+                        //Debug.Log(infoList[i].toString());
+                     }
+                    // free all remaining empty spaces in list
+                    for (int j = userCount;  j < serverSize; ++j)
+                        infoList[j].hold = false;
+
+                }
+                listLock.ReleaseMutex();
             }
         }
 
@@ -206,14 +375,10 @@ public class ClientController : MonoBehaviour {
             serverStream.Read(inStream, 0, transferDataSize);
             returndata = System.Text.Encoding.ASCII.GetString(inStream);
             returndata = returndata.Substring(0, returndata.IndexOf("<EOF>"));
-            displayMessage("Data from Server : " + returndata);
+            Debug.Log("Data from Server : " + returndata);
             return;
         }
 
-        private void displayMessage(string msg)
-        {
-            Debug.Log(msg);
-        }
     }
 
 }

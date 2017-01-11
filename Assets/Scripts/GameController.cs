@@ -112,12 +112,18 @@ public class GameController : MonoBehaviour {
 
     public void pauseGame()
     {
+        InputController.gamePaused = true;
         currentState = GameState.GAME_PAUSE;
     }
 
     public void continueGame()
     {
         currentState = GameState.GAME_PLAY;
+    }
+
+    public void exitGame()
+    {
+        currentState = GameState.GAME_START;
     }
 
 }
