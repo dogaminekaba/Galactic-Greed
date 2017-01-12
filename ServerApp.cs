@@ -9,16 +9,12 @@ using System.Net.Mail;
 using System.Collections;
 using System.Globalization;
 
-public class Point
+public class Info
 {
-    public float x;
-    public float y;
+    public string userInfo;
+    public string clientName; // to avoid multiple log-ins at same time
+    public bool dead; 
     public bool hold = false;
-
-    public string toString()
-    {
-        return "x:" + x + "y:" + y;
-    }
 }
 
 public class ServerApp
@@ -28,7 +24,7 @@ public class ServerApp
     public static FileInfo[] Files;
     public static Mutex fileLock;
     public static Mutex positionLock;
-    public static Point[] coordList;
+    public static Info[] infoList;
 
     public static int clientCounter = 0;
     public const int serverSize = 20; // max # of the connected clients 
@@ -50,10 +46,10 @@ public class ServerApp
         d = new DirectoryInfo(Directory.GetCurrentDirectory());
         Files = d.GetFiles("*.log"); //Getting log files
 
-        //------------- Initialize client coordinate array -------------//
-        coordList = new Point[serverSize];
+        //------------- Initialize client info array -------------//
+        infoList = new Info[serverSize];
         for(int i = 0; i < serverSize; ++i)
-            coordList[i] = new Point();
+            infoList[i] = new Info();
 
         //------------- Initialize mutex locks -------------//
         fileLock = new Mutex();
@@ -78,10 +74,10 @@ public class ServerApp
                     positionLock.WaitOne();
                     for (int i = 0; i < serverSize; ++i )
                     {
-                        if(!(coordList[i].hold))
+                        if(!(infoList[i].hold))
                         {
                             availableId = i;
-                            coordList[i].hold = true;
+                            infoList[i].hold = true;
                             clientCounter += 1;
                             break;
                         }
@@ -104,31 +100,6 @@ public class ServerApp
         serverSocket.Stop();
     }
 
-    static void sendMailToUser(String userMail)
-    {
-        try
-        {
-            SmtpClient client = new SmtpClient();
-            client.Port = 587;
-            client.Host = "smtp.gmail.com";
-            client.EnableSsl = true;
-            client.Timeout = 10000;
-            client.DeliveryMethod = SmtpDeliveryMethod.Network;
-            client.UseDefaultCredentials = false;
-            client.Credentials = new System.Net.NetworkCredential("galacticgreed@gmail.com", "dmk1995dmk");
-
-            MailMessage mm = new MailMessage("donotreply@domain.com", userMail, "test", "test");
-            mm.BodyEncoding = UTF8Encoding.UTF8;
-            mm.DeliveryNotificationOptions = DeliveryNotificationOptions.OnFailure;
-
-            client.Send(mm);
-        }
-        catch(Exception e)
-        {
-            Console.WriteLine(e.Message);
-        }
-    }
-
 }
 
 //------------- Handle each client request separatly -------------//
@@ -140,13 +111,16 @@ public class handleClinet
 
     private TcpClient clientSocket;
     private bool clientConnected = false;
-    private string clientName;
-    private Point currentPosition;
     private string otherPositions = "";
+    private string clientName;
+    private string password;
+    private string email;
+    private Info currentInfo;
+    private bool newPlayer = true;
 
     public void startClient(TcpClient inClientSocket)
     {
-        currentPosition = new Point();
+        currentInfo = new Info();
         this.clientSocket = inClientSocket;
         clientConnected = true;
         Thread ctThread = new Thread(getInfo);
@@ -167,17 +141,20 @@ public class handleClinet
                 NetworkStream networkStream = clientSocket.GetStream();
                 networkStream.Read(bytesFrom, 0, transferDataSize);
                 dataFromClient = System.Text.Encoding.ASCII.GetString(bytesFrom);
-                
+
+                //------------- Client logged out -------------//
                 if (dataFromClient.IndexOf("I died") > -1)
                 {
                     Console.WriteLine("client left");
                     clientConnected = false;
                     clientSocket.Close();
                     --ServerApp.clientCounter;
+
+                    // TO-DO save info to log file 
+
                     ServerApp.positionLock.WaitOne();
-                    ServerApp.coordList[clientID].x = 0;
-                    ServerApp.coordList[clientID].y = 0;
-                    ServerApp.coordList[clientID].hold = false;
+                    ServerApp.infoList[clientID].userInfo = "";
+                    ServerApp.infoList[clientID].hold = false;
                     ServerApp.positionLock.ReleaseMutex();
                 }
 
@@ -188,7 +165,7 @@ public class handleClinet
 
                     Console.WriteLine("Signing up");
                     if (signUp(dataFromClient))
-                        serverResponse = "*signupsucceed*<EOF>";
+                        serverResponse = "*signupsucceed*id:" + clientID + "<EOF>";
                     else
                         serverResponse = "*signupfailed*<EOF>";
 
@@ -200,6 +177,10 @@ public class handleClinet
                 //------------- Retrieve information from user -------------//
                 else if (dataFromClient.IndexOf("*info*") > -1)
                 {
+                    int subStartIndex;
+
+                    subStartIndex = dataFromClient.IndexOf("x:");
+                    dataFromClient = dataFromClient.Substring(subStartIndex);
                     dataFromClient = dataFromClient.Substring(0, dataFromClient.IndexOf("<EOF>"));
 
                     otherPositions = updatePosition(dataFromClient);
@@ -227,9 +208,8 @@ public class handleClinet
                 //Console.WriteLine(ex.ToString());
 
                 ServerApp.positionLock.WaitOne();
-                ServerApp.coordList[clientID].x = 0;
-                ServerApp.coordList[clientID].y = 0;
-                ServerApp.coordList[clientID].hold = false;
+                ServerApp.infoList[clientID].userInfo = "";
+                ServerApp.infoList[clientID].hold = false;
                 ServerApp.positionLock.ReleaseMutex();
                 Console.WriteLine(clientName + " is left.");
             }
@@ -239,43 +219,35 @@ public class handleClinet
     //------------- Update current position -------------//
     private string updatePosition(string dataFromClient)
     {
-        int subStartIndex;
-        string xPos;
-        string yPos;
-
-        string otherPositions = "";
-
-        subStartIndex = dataFromClient.IndexOf("x:") + "x:".Length;
-        xPos = dataFromClient.Substring(subStartIndex);
-        xPos = xPos.Substring(0, xPos.IndexOf("y:"));
-
-        subStartIndex = dataFromClient.IndexOf("y:") + "y:".Length;
-        yPos = dataFromClient.Substring(subStartIndex);
-
-        currentPosition.x = float.Parse(xPos, CultureInfo.InvariantCulture);
-        currentPosition.y = float.Parse(yPos, CultureInfo.InvariantCulture);
-
-        ServerApp.positionLock.WaitOne();
-
-        ServerApp.coordList[clientID].x = currentPosition.x;
-        ServerApp.coordList[clientID].y = currentPosition.y;
-
-        ServerApp.positionLock.ReleaseMutex();
-
-        ServerApp.positionLock.WaitOne();
-
-        for (int i = 0; i < ServerApp.serverSize; ++i)
+        string otherUserInfos = "";
+        int counter = 0;
+        try
         {
-            if (ServerApp.coordList[i].hold)
-            {
-                otherPositions += ServerApp.coordList[i].toString();
-                
-            }
-        }
-        Console.WriteLine("others: " + otherPositions);
-        ServerApp.positionLock.ReleaseMutex();
+            // put new info of the client
+            ServerApp.positionLock.WaitOne();
+            ServerApp.infoList[clientID].userInfo = "id:" + clientID + dataFromClient;
+            ServerApp.positionLock.ReleaseMutex();
 
-        return otherPositions;
+            // retrieve others infos
+            ServerApp.positionLock.WaitOne();
+            for (int i = 0; i < ServerApp.serverSize; ++i)
+            {
+                if (ServerApp.infoList[i].hold && i != clientID)
+                {
+                    otherUserInfos += ServerApp.infoList[i].userInfo;
+                    ++counter;
+                }
+            }
+            otherUserInfos = "*others*userSize:" + counter + otherUserInfos;
+            //Console.WriteLine(otherUserInfos);
+            ServerApp.positionLock.ReleaseMutex();
+        }
+        catch(Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
+
+        return otherUserInfos;
     }
 
     //------------- Sign up -------------//
@@ -302,8 +274,8 @@ public class handleClinet
 
         clientName = username;
 
-        /*
-        ServerApp.mLock.WaitOne();
+
+        ServerApp.fileLock.WaitOne();
 
         // Search for username in the file array
 
@@ -315,14 +287,61 @@ public class handleClinet
         }
         if(!userExists)
         {
-            File.Open(username + ".log" , FileMode.Create);
-            ServerApp.Files = ServerApp.d.GetFiles("*.log"); //Update log file array
+            try
+            {
+                System.IO.FileStream usernameopen = File.Open(username + ".log", FileMode.Create);
+                System.IO.FileStream mailopen = File.Open(email + ".log", FileMode.Create);
+                ServerApp.Files = ServerApp.d.GetFiles("*.log"); //Update log file array
+
+                usernameopen.Close();
+                mailopen.Close();
+
+                // put username and password info inside mail-log file
+                System.IO.StreamWriter mailfile = new System.IO.StreamWriter(email + ".log");
+                mailfile.WriteLine("username: " + username);
+                mailfile.WriteLine("password: " + password);
+                mailfile.Close();
+
+                System.IO.StreamWriter usernamefile = new System.IO.StreamWriter(username + ".log");
+                usernamefile.WriteLine("password: " + password);
+                usernamefile.Close();
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
             return true;
         }
 
-        ServerApp.mLock.ReleaseMutex();*/
+        ServerApp.fileLock.ReleaseMutex();
 
         return false;
+    }
+
+    private void sendMailToUser(String userMail)
+    {
+        try
+        {
+            SmtpClient client = new SmtpClient();
+            client.Port = 587;
+            client.Host = "smtp.gmail.com";
+            client.EnableSsl = true;
+            client.Timeout = 10000;
+            client.DeliveryMethod = SmtpDeliveryMethod.Network;
+            client.UseDefaultCredentials = false;
+            client.Credentials = new System.Net.NetworkCredential("galacticgreed@gmail.com", "dmk1995dmk");
+
+            MailMessage mm = new MailMessage("donotreply@domain.com", userMail, "test", "test");
+            mm.BodyEncoding = UTF8Encoding.UTF8;
+            mm.DeliveryNotificationOptions = DeliveryNotificationOptions.OnFailure;
+
+            client.Send(mm);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
     }
 
     //------------- Log in -------------//

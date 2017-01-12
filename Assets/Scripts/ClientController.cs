@@ -13,12 +13,12 @@ public class Info
     public float theta;
     public int color;
     public bool shotFired;
-    public bool dead;
+    public int score;
     public bool hold = false;
 
     public string toString()
     {
-        return "id:" + clientID + "x:" + x + "y:" + y + "theta:" + theta + "color:" + color + "shotFired:" + shotFired + "dead:" + dead;
+        return "id:" + clientID + "x:" + x + "y:" + y + "theta:" + theta + "color:" + color + "shotFired:" + shotFired + "score:" + score;
     }
 }
 
@@ -31,6 +31,7 @@ public class ClientController : MonoBehaviour {
     public static int serverSize = 20;
 
     static protected bool signedUp = false;
+    static protected bool loggedIn = false;
     static protected Thread thSendStatus;
     static protected Info currentInfo;
 
@@ -56,10 +57,10 @@ public class ClientController : MonoBehaviour {
         user = new Client();
         user.connect();
 
-        // retrieve info and fill currentInfo
+        // TO-DO retrieve info and fill currentInfo
+
         currentInfo = new Info();
         currentInfo.color = 0;
-        currentInfo.dead = false;
         currentInfo.hold = true;
         currentInfo.theta = InputController.shipRotationZ;
         currentInfo.shotFired = false;
@@ -73,17 +74,20 @@ public class ClientController : MonoBehaviour {
         thSendStatus = new Thread(sendStatus);
         thSendStatus.Start();
         signedUp = true;
+        loggedIn = true;
     }
 
 	// Update is called once per frame
 	void Update () {
-        if (usersShip)
+        if (usersShip && connectedToServer)
         {
             usersPosition = usersShip.transform.position;
 
             currentInfo.theta = InputController.shipRotationZ;
             currentInfo.x = usersPosition.x;
             currentInfo.y = usersPosition.y;
+            currentInfo.score = GameController.score;
+
             if (InputController.shotFire)
             {
                 currentInfo.shotFired = true;
@@ -91,11 +95,10 @@ public class ClientController : MonoBehaviour {
             }
             else
                 currentInfo.shotFired = false;
-
-            if (!connectedToServer)
-                disconnected();
         }
-	}
+        if (!connectedToServer)
+            disconnected();
+    }
 
     public void signUp()
     {
@@ -157,7 +160,7 @@ public class ClientController : MonoBehaviour {
     {
         while (!programEnded)
         {
-            if (connectedToServer && signedUp)
+            if (connectedToServer && (signedUp || loggedIn))
                 user.sendData("*info*" + currentInfo.toString());
         }
 
@@ -173,11 +176,13 @@ public class ClientController : MonoBehaviour {
 
     static public void disconnected()
     {
-        if(GameController.currentState != GameController.GameState.SERVER_CONNECTION_ERROR)
-            GameController.prevState = GameController.currentState;
-        GameController.currentState = GameController.GameState.SERVER_CONNECTION_ERROR;
+        //loggedIn = false;
+        //signedUp = false;
         connectedToServer = false;
         InputController.gamePaused = true;
+        if (GameController.currentState != GameController.GameState.SERVER_CONNECTION_ERROR)
+            GameController.prevState = GameController.currentState;
+        GameController.currentState = GameController.GameState.SERVER_CONNECTION_ERROR;
     }
 
     static public void connected()
@@ -199,13 +204,14 @@ public class ClientController : MonoBehaviour {
         private const int transferDataSize = 1024;
 
         //---create a TCPClient object at the IP and port no.---
-        private TcpClient clientSocket = new TcpClient();
+        private TcpClient clientSocket;
         private NetworkStream serverStream;
 
         public void connect()
         {
             try
             {
+                clientSocket = new TcpClient();
                 clientSocket.Connect(SERVER_IP, PORT_NO);
                 ClientController.connected();
             }
@@ -238,8 +244,11 @@ public class ClientController : MonoBehaviour {
                 if (returndata.IndexOf("*signupsucceed*") > -1)
                 {
                     signedUp = true;
-                    // fetch user id here!
-
+                    thSendStatus.Start();
+                }
+                else if (returndata.IndexOf("*loginsucceed*") > -1)
+                {
+                    loggedIn = true;
                     thSendStatus.Start();
                 }
                 else if (returndata.IndexOf("*others*") > -1)
@@ -249,6 +258,7 @@ public class ClientController : MonoBehaviour {
             catch (Exception e)
             {
                 Debug.Log(e.Message);
+                clientSocket.Close();
                 ClientController.disconnected();
             }
         }
@@ -262,7 +272,7 @@ public class ClientController : MonoBehaviour {
             string theta;
             string color;
             string shotFire;
-            string dead;
+            string score;
             string id;
             string count;
 
@@ -276,7 +286,11 @@ public class ClientController : MonoBehaviour {
             count = othersInfos.Substring(subStartIndex);
 
             if (count.IndexOf("id:") < 0)
+            {
                 userCount = 0;
+                for (int i = 0; i < serverSize; ++i)
+                    infoList[i].hold = false;
+            }
             else
             {
                 count = count.Substring(0, count.IndexOf("id:"));
@@ -329,17 +343,17 @@ public class ClientController : MonoBehaviour {
                          // shot fire info
                          subStartIndex = othersInfos.IndexOf("shotFired:") + "shotFired:".Length;
                          shotFire = othersInfos.Substring(subStartIndex);
-                         shotFire = shotFire.Substring(0, shotFire.IndexOf("dead:"));
+                         shotFire = shotFire.Substring(0, shotFire.IndexOf("score:"));
 
                          infoList[i].shotFired = bool.Parse(shotFire);
 
-                         // dead or alive info
-                         subStartIndex = othersInfos.IndexOf("dead:") + "dead:".Length;
-                         dead = othersInfos.Substring(subStartIndex);
-                         if(dead.IndexOf("id:") > 0)
-                            dead = dead.Substring(0, dead.IndexOf("id:"));
+                         // score info
+                         subStartIndex = othersInfos.IndexOf("score:") + "score:".Length;
+                         score = othersInfos.Substring(subStartIndex);
+                         if(score.IndexOf("id:") > 0)
+                            score = score.Substring(0, score.IndexOf("id:"));
 
-                        infoList[i].dead = bool.Parse(dead);
+                         infoList[i].score = int.Parse(score);
 
                          othersInfos = othersInfos.Substring(subStartIndex);
                          subStartIndex = othersInfos.IndexOf("id:");

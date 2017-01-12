@@ -24,13 +24,15 @@ public class InputController : MonoBehaviour {
     private float speed;
     private float shotSpeed;
 
+    private TextMesh userScore;
+
     private float xMax, xMin, yMax, yMin;
 
     private float userPosX = 0;
     private float userPosY = 0;
 
     // input flag
-    private bool DEBUG_CODE = true;
+    private bool STANDALONE_INPUT = true;
 
     // Use this for initialization
     void Start () {
@@ -39,9 +41,16 @@ public class InputController : MonoBehaviour {
         enemyShips = new GameObject[ClientController.serverSize];
         for (int i = 0; i < ClientController.serverSize; ++i)
         {
+            TextMesh enemyScore;
             enemyShips[i] = fac.createEnemy();
+            enemyScore = enemyShips[i].AddComponent<TextMesh>();
+            enemyScore.characterSize = 0.35f;
             enemyShips[i].SetActive(false);
         }
+
+        userScore = usersShip.AddComponent<TextMesh>();
+        userScore.characterSize = 0.35f;
+        userScore.text = "\n" + GameController.score.ToString();
 
         xMin = -width * 2.0f / 5;
         xMax = width * 2.0f / 5;
@@ -54,9 +63,12 @@ public class InputController : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-        movePlayer();
-        showOthers();
-	}
+        if (ClientController.connectedToServer)
+        {
+            movePlayer();
+            showOthers();
+        }
+    }
 
     private void showOthers()
     {
@@ -71,7 +83,8 @@ public class InputController : MonoBehaviour {
                                                                     ClientController.infoList[i].y,
                                                                     usersShip.transform.position.z);
                     enemyShips[i].transform.rotation = Quaternion.identity;
-                    enemyShips[i].transform.Rotate(Vector3.forward, ClientController.infoList[i].theta);
+                    enemyShips[i].transform.Rotate(-Vector3.forward, ClientController.infoList[i].theta);
+                    enemyShips[i].GetComponent<TextMesh>().text = "\n" + ClientController.infoList[i].score.ToString();
                     enemyShips[i].SetActive(true);
                     if(ClientController.infoList[i].shotFired)
                     {
@@ -122,7 +135,7 @@ public class InputController : MonoBehaviour {
 
             // Player move //
             
-            if (DEBUG_CODE)
+            if (STANDALONE_INPUT)
             {
                 // Editor controls for debug
                 moveHorizontal = Input.GetAxis("Horizontal");
@@ -174,6 +187,7 @@ public class InputController : MonoBehaviour {
 
             cam.transform.rotation = usersShip.transform.rotation;
         }
+        userScore.text = "\n" + GameController.score.ToString();
     }
 
 }

@@ -11,6 +11,7 @@ public class GameController : MonoBehaviour {
     public GameObject inGameUI;
     public static GameState currentState;
     public static GameState prevState;
+    public static int score;
 
     public enum GameState
     {

@@ -3,10 +3,13 @@ using System.Collections;
 
 public class ShotController : MonoBehaviour {
 
+    private GameObject enemyExplosion = null;
+    private GameObject playerExplosion = null;
+
     // Use this for initialization
     void Start()
     {
-       
+        
     }
 
     // Update is called once per frame
@@ -18,12 +21,22 @@ public class ShotController : MonoBehaviour {
     {
         if (this.tag == "Player Shot" && other.tag == "Enemy")
         {
-            InputController.fac.createEnemyExplosion(other.transform.position);
+            GameController.score++;
+            enemyExplosion = InputController.fac.createEnemyExplosion(other.transform.position);
         }
         if (this.tag == "Enemy Shot" && other.tag == "Player")
         {
-            Debug.Log("shot!");
+            if (GameController.score > 0)
+                GameController.score--;
             InputController.fac.createPlayerExplosion(other.transform.position);
         }
     }
+
+    private void OnDestroy()
+    {
+        if (playerExplosion != null)
+            Destroy(playerExplosion);
+        if (enemyExplosion != null)
+            Destroy(enemyExplosion);
+    } 
 }
