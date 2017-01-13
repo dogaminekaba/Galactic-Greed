@@ -113,10 +113,12 @@ public class handleClinet
     private bool clientConnected = false;
     private string otherPositions = "";
     private string clientName;
-    private string password;
-    private string email;
+    private string userPassword;
+    private string userMail;
     private Info currentInfo;
-    private bool newPlayer = true;
+    private string posX;
+    private string posY;
+    private string score;
 
     public void startClient(TcpClient inClientSocket)
     {
@@ -145,12 +147,14 @@ public class handleClinet
                 //------------- Client logged out -------------//
                 if (dataFromClient.IndexOf("I died") > -1)
                 {
-                    Console.WriteLine("client left");
+                    Console.WriteLine(clientName + " is left.");
                     clientConnected = false;
                     clientSocket.Close();
                     --ServerApp.clientCounter;
 
-                    // TO-DO save info to log file 
+                    ServerApp.fileLock.WaitOne();
+                    saveInfosToLog();
+                    ServerApp.fileLock.ReleaseMutex();
 
                     ServerApp.positionLock.WaitOne();
                     ServerApp.infoList[clientID].userInfo = "";
@@ -168,6 +172,23 @@ public class handleClinet
                         serverResponse = "*signupsucceed*id:" + clientID + "<EOF>";
                     else
                         serverResponse = "*signupfailed*<EOF>";
+
+                    byte[] outStream = System.Text.Encoding.ASCII.GetBytes(serverResponse);
+                    networkStream.Write(outStream, 0, outStream.Length);
+                    networkStream.Flush();
+                }
+
+                //------------- Log in request -------------//
+                else if (dataFromClient.IndexOf("*login*") > -1)
+                {
+                    dataFromClient = dataFromClient.Substring(0, dataFromClient.IndexOf("<EOF>"));
+                    string savedData = "";
+
+                    Console.WriteLine("Logging In");
+                    if (logIn(dataFromClient, savedData))
+                        serverResponse = "*loginsucceed*" + savedData + "<EOF>";
+                    else
+                        serverResponse = "*loginfailed*<EOF>";
 
                     byte[] outStream = System.Text.Encoding.ASCII.GetBytes(serverResponse);
                     networkStream.Write(outStream, 0, outStream.Length);
@@ -204,16 +225,31 @@ public class handleClinet
             }
             catch (Exception ex)
             {
-                clientConnected = false;
                 //Console.WriteLine(ex.ToString());
+
+                Console.WriteLine(clientName + " is left.");
+                clientConnected = false;
+                clientSocket.Close();
+                --ServerApp.clientCounter;
+
+                ServerApp.fileLock.WaitOne();
+                saveInfosToLog();
+                ServerApp.fileLock.ReleaseMutex();
 
                 ServerApp.positionLock.WaitOne();
                 ServerApp.infoList[clientID].userInfo = "";
                 ServerApp.infoList[clientID].hold = false;
                 ServerApp.positionLock.ReleaseMutex();
-                Console.WriteLine(clientName + " is left.");
             }
         }
+    }
+
+    private void saveInfosToLog()
+    {
+        System.IO.StreamWriter usernamefile = new System.IO.StreamWriter(clientName + ".log");
+        usernamefile.WriteLine("password:" + userPassword);
+        usernamefile.WriteLine("posX:" + posX + "posY:" + posY + "score:" + score);
+        usernamefile.Close();
     }
 
     //------------- Update current position -------------//
@@ -241,6 +277,21 @@ public class handleClinet
             otherUserInfos = "*others*userSize:" + counter + otherUserInfos;
             //Console.WriteLine(otherUserInfos);
             ServerApp.positionLock.ReleaseMutex();
+
+
+            int subStartIndex = dataFromClient.IndexOf("x:") + "x:".Length;
+            posX = dataFromClient.Substring(subStartIndex);
+            posX = posX.Substring(0, posX.IndexOf("y:"));
+
+            subStartIndex = dataFromClient.IndexOf("y:") + "y:".Length;
+            posY = dataFromClient.Substring(subStartIndex);
+            posY = posY.Substring(0, posY.IndexOf("theta:"));
+
+            subStartIndex = dataFromClient.IndexOf("score:") + "score:".Length;
+            score = dataFromClient.Substring(subStartIndex);
+
+            //Console.WriteLine("x: " + posX + " y: " + posY + " score: " + score);
+
         }
         catch(Exception e)
         {
@@ -274,48 +325,117 @@ public class handleClinet
 
         clientName = username;
 
-
         ServerApp.fileLock.WaitOne();
-
         // Search for username in the file array
-
-        Console.WriteLine("username: " + username);
         foreach (FileInfo file in ServerApp.Files)
         {
             if(file.Name.Equals(username + ".log"))
                 userExists = true;
         }
+        ServerApp.fileLock.ReleaseMutex();
+
         if(!userExists)
         {
             try
             {
+                ServerApp.fileLock.WaitOne();
+
                 System.IO.FileStream usernameopen = File.Open(username + ".log", FileMode.Create);
-                System.IO.FileStream mailopen = File.Open(email + ".log", FileMode.Create);
+                //System.IO.FileStream mailopen = File.Open(email + ".log", FileMode.Create);
                 ServerApp.Files = ServerApp.d.GetFiles("*.log"); //Update log file array
 
                 usernameopen.Close();
-                mailopen.Close();
+                //mailopen.Close();
 
                 // put username and password info inside mail-log file
-                System.IO.StreamWriter mailfile = new System.IO.StreamWriter(email + ".log");
+                /*System.IO.StreamWriter mailfile = new System.IO.StreamWriter(email + ".log");
                 mailfile.WriteLine("username: " + username);
                 mailfile.WriteLine("password: " + password);
-                mailfile.Close();
+                mailfile.Close();*/
 
                 System.IO.StreamWriter usernamefile = new System.IO.StreamWriter(username + ".log");
                 usernamefile.WriteLine("password: " + password);
                 usernamefile.Close();
+
+                ServerApp.fileLock.ReleaseMutex();
             }
             catch(Exception e)
             {
                 Console.WriteLine(e.Message);
                 return false;
             }
+            posX = "0";
+            posY ="0";
+            score = "0";
+            userPassword = password;
             return true;
         }
+        Console.WriteLine("User Exists.");
+        return false;
+    }
 
+    //------------- Log In -------------//
+    private bool logIn(string dataFromClient, string savedData)
+    {
+        bool userExists = false;
+        int subStartIndex;
+        string username;
+        string password;
+        string userInfo = "";
+
+        subStartIndex = dataFromClient.IndexOf("username:") + "username:".Length;
+        username = dataFromClient.Substring(subStartIndex);
+        username = username.Substring(0, username.IndexOf("password:"));
+
+        subStartIndex = dataFromClient.IndexOf("password:") + "password:".Length;
+        password = dataFromClient.Substring(subStartIndex);
+
+        Console.WriteLine("\n username: " + username + "\n password: " + password + "\n");
+
+        ServerApp.fileLock.WaitOne();
+        foreach (FileInfo file in ServerApp.Files)
+        {
+            if(file.Name.Equals(username + ".log"))
+                userExists = true;
+        }
         ServerApp.fileLock.ReleaseMutex();
 
+        if (userExists)
+        {
+            clientName = username;
+            try
+            {
+                ServerApp.fileLock.WaitOne();
+                System.IO.StreamReader usernamefile = new System.IO.StreamReader(username + ".log");
+                userPassword = usernamefile.ReadLine();
+                subStartIndex = userPassword.IndexOf("password:") + "password:".Length;
+                userPassword = userPassword.Substring(subStartIndex);
+
+                if(password.Equals(userPassword))
+                {
+                    Console.WriteLine("match");
+                    userInfo = usernamefile.ReadLine();
+                    savedData = userInfo;
+                    usernamefile.Close();
+                    ServerApp.fileLock.ReleaseMutex();
+                    return true;
+                }
+                else
+                {
+                    ServerApp.fileLock.ReleaseMutex();
+                    return false;
+                }
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
+        else
+        {
+            Console.WriteLine("No such user.");
+            return false;
+        }
         return false;
     }
 
@@ -343,7 +463,4 @@ public class handleClinet
             Console.WriteLine(e.Message);
         }
     }
-
-    //------------- Log in -------------//
-
 } 

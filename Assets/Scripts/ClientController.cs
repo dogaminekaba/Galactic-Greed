@@ -37,7 +37,6 @@ public class ClientController : MonoBehaviour {
 
     public GameObject connectionErrorUI;
     public GameObject logInUI;
-    public GameObject usersShip;
 
     private Vector3 usersPosition;
     private Client user;
@@ -48,6 +47,11 @@ public class ClientController : MonoBehaviour {
     private InputField userNameInput;
     [SerializeField]
     private InputField passwordInput;
+
+    [SerializeField]
+    private InputField userNameInputLogIn;
+    [SerializeField]
+    private InputField passwordInputLogIn;
 
     // Use this for initialization
     void Start () {
@@ -72,16 +76,15 @@ public class ClientController : MonoBehaviour {
             infoList[i] = new Info();
 
         thSendStatus = new Thread(sendStatus);
-        thSendStatus.Start();
-        signedUp = true;
-        loggedIn = true;
+        //signedUp = true;
+        //loggedIn = true;
     }
 
 	// Update is called once per frame
 	void Update () {
-        if (usersShip && connectedToServer)
+        if (InputController.usersShip && connectedToServer)
         {
-            usersPosition = usersShip.transform.position;
+            usersPosition = InputController.usersShip.transform.position;
 
             currentInfo.theta = InputController.shipRotationZ;
             currentInfo.x = usersPosition.x;
@@ -95,8 +98,46 @@ public class ClientController : MonoBehaviour {
             }
             else
                 currentInfo.shotFired = false;
+
+            Debug.Log(currentInfo.toString());
         }
         if (!connectedToServer)
+            disconnected();
+    }
+
+    public void logIn()
+    {
+        String username = userNameInputLogIn.text;
+        String password = passwordInputLogIn.text;
+        bool usernameOutOfSize = false;
+        bool passwordOutOfSize = false;
+
+        if (username.Length < 1 || username.Length > 20)
+            usernameOutOfSize = true;
+
+        if (password.Length < 1 || password.Length > 20)
+            passwordOutOfSize = true;
+
+        if (usernameOutOfSize)
+        {
+            userNameInputLogIn.text = "";
+            userNameInputLogIn.placeholder.GetComponent<Text>().text = "username (1-20)";
+        }
+        if (passwordOutOfSize)
+        {
+            passwordInputLogIn.text = "";
+            passwordInputLogIn.placeholder.GetComponent<Text>().text = "password (1-20)";
+        }
+
+        if (connectedToServer)
+        {
+            Debug.Log("*login* username: " + username + " password: " + password);
+
+            if (!usernameOutOfSize && !passwordOutOfSize)
+                user.sendData("*login*username:" + username + "password:" + password);
+        }
+        // not connected to server, try to connect again
+        else
             disconnected();
     }
 
@@ -146,7 +187,6 @@ public class ClientController : MonoBehaviour {
         if (connectedToServer)
         {
             Debug.Log("*signup* email: " + email + " username: " + username + " password: " + password);
-            GameController.currentState = GameController.GameState.GAME_PLAY;
             
             if (!emailOutOfSize && !outOfMailFormat && !usernameOutOfSize && !passwordOutOfSize)
                 user.sendData("*signup*email:" + email + "username:" + username + "password:" + password);
@@ -176,8 +216,8 @@ public class ClientController : MonoBehaviour {
 
     static public void disconnected()
     {
-        //loggedIn = false;
-        //signedUp = false;
+        loggedIn = false;
+        signedUp = false;
         connectedToServer = false;
         InputController.gamePaused = true;
         if (GameController.currentState != GameController.GameState.SERVER_CONNECTION_ERROR)
@@ -199,8 +239,8 @@ public class ClientController : MonoBehaviour {
     public class Client
     {
         private const int PORT_NO = 8080;
-        //private const string SERVER_IP = "138.68.168.212";
-        private const string SERVER_IP = "192.168.1.108";
+        private const string SERVER_IP = "138.68.168.212";
+        //private const string SERVER_IP = "172.20.10.3";
         private const int transferDataSize = 1024;
 
         //---create a TCPClient object at the IP and port no.---
@@ -244,12 +284,46 @@ public class ClientController : MonoBehaviour {
                 if (returndata.IndexOf("*signupsucceed*") > -1)
                 {
                     signedUp = true;
+                    GameController.currentState = GameController.GameState.GAME_PLAY;
                     thSendStatus.Start();
                 }
                 else if (returndata.IndexOf("*loginsucceed*") > -1)
                 {
                     loggedIn = true;
+
+                    string posX;
+                    string posY;
+                    string savedScore;
+                    float xInit;
+                    float yInit;
+
+                    int subStartIndex = returndata.IndexOf("posX:") + "posX:".Length;
+                    posX = returndata.Substring(subStartIndex);
+                    posX = posX.Substring(0, posX.IndexOf("posY:"));
+                    xInit = float.Parse(posX, CultureInfo.InvariantCulture);
+
+                    subStartIndex = returndata.IndexOf("posY:") + "posY:".Length;
+                    posY = returndata.Substring(subStartIndex);
+                    posY = posY.Substring(0, posY.IndexOf("score:"));
+                    yInit = float.Parse(posY, CultureInfo.InvariantCulture);
+
+                    subStartIndex = returndata.IndexOf("score:") + "score:".Length;
+                    savedScore = returndata.Substring(subStartIndex);
+                    GameController.score = int.Parse(savedScore);
+
+                    Debug.Log("1: " + xInit + " 2: " + yInit + " 3: " + GameController.score);
+                    InputController.userPosX = xInit;
+                    InputController.userPosY = yInit;
+                    GameController.currentState = GameController.GameState.GAME_PLAY;
                     thSendStatus.Start();
+                }
+                else if (returndata.IndexOf("*signupfailed*") > -1)
+                {
+                    GameController.currentState = GameController.GameState.SIGN_UP;
+                }
+                else if (returndata.IndexOf("*loginfailed*") > -1)
+                {
+                    GameController.currentState = GameController.GameState.LOG_IN;
                 }
                 else if (returndata.IndexOf("*others*") > -1)
                     parseOthersInfos(returndata);
@@ -262,6 +336,7 @@ public class ClientController : MonoBehaviour {
                 ClientController.disconnected();
             }
         }
+
 
         private void parseOthersInfos(string othersInfos)
         {

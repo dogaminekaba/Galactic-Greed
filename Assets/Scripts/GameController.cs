@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Threading;
 
 public class GameController : MonoBehaviour {
 
@@ -24,7 +25,7 @@ public class GameController : MonoBehaviour {
     };
 
     void Start () {
-        currentState = GameState.GAME_PLAY;
+        currentState = GameState.GAME_START;
         prevState = currentState;
 	}
 	
@@ -124,7 +125,8 @@ public class GameController : MonoBehaviour {
 
     public void exitGame()
     {
-        currentState = GameState.GAME_START;
+        ClientController.programEnded = true;
+        Application.Quit();
     }
 
 }

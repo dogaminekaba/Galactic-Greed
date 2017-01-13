@@ -10,8 +10,9 @@ public class InputController : MonoBehaviour {
     public static bool shotFire = false;
     public static Factory fac;
 
-    [SerializeField] 
-    private GameObject usersShip;
+    public GameObject usersShipPref;
+
+    public static GameObject usersShip;
     [SerializeField]
     private GameObject [] enemyShips;
     [SerializeField]
@@ -24,12 +25,12 @@ public class InputController : MonoBehaviour {
     private float speed;
     private float shotSpeed;
 
-    private TextMesh userScore;
+    private static TextMesh userScore;
 
     private float xMax, xMin, yMax, yMin;
 
-    private float userPosX = 0;
-    private float userPosY = 0;
+    public static float userPosX = 0;
+    public static float userPosY = 0;
 
     // input flag
     private bool STANDALONE_INPUT = true;
@@ -47,7 +48,7 @@ public class InputController : MonoBehaviour {
             enemyScore.characterSize = 0.35f;
             enemyShips[i].SetActive(false);
         }
-
+        usersShip = Instantiate(usersShipPref);
         userScore = usersShip.AddComponent<TextMesh>();
         userScore.characterSize = 0.35f;
         userScore.text = "\n" + GameController.score.ToString();
