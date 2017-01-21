@@ -8,11 +8,11 @@ Aim of this project is providing users to continue their games from different de
 As a side goal, a real-time mobile multiplayer game is developed. A continuous data transfer is provided for the real-time game.
 
 
-### To Previev Codes and Making Changes
+### Previev Codes and Making Changes
 Project is developed using Unity 5.5.0f3 and the programmig language is C#. Mobile client app (core game) is developed with Unity, server program is written as a console program using C# and Visual Studio 2013. To provide communication, .Net Socket class is used for socket programming.
 
 
-### To Run
+### Run
 A server computer is needed. If the game is going to be played on LAN the ip address in the Assets/Scripts/ClientController.cs file must be updated with the ip of the server computer in the LAN. After the ip change, a build of the new Unity application is required. ServerApp.cs file must be compiled and run in the server computer.
 
 ### Some Screenshots From Game
