@@ -13,7 +13,7 @@ Project is developed using Unity 5.5.0f3 and the programmig language is C#. Mobi
 
 
 ### To Run
-A server computer is needed. If the game is going to be played on LAN the ip address in the Assets/ClientController.cs file must be updated with the ip of the server computer in the LAN. After the ip change, a build of the new Unity application is required. ServerApp.cs file must be compiled and run in the server computer.
+A server computer is needed. If the game is going to be played on LAN the ip address in the Assets/Scripts/ClientController.cs file must be updated with the ip of the server computer in the LAN. After the ip change, a build of the new Unity application is required. ServerApp.cs file must be compiled and run in the server computer.
 
 ### Some Screenshots From Game
 <p>
