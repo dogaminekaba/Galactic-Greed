@@ -8,7 +8,7 @@ Aim of this project is providing users to continue their games from different de
 As a side goal, a real-time mobile multiplayer game is developed. A continuous data transfer is provided for the real-time game.
 
 
-### Previev Codes and Making Changes
+### Preview Codes and Making Changes
 Project is developed using Unity 5.5.0f3 and the programmig language is C#. Mobile client app (core game) is developed with Unity, server program is written as a console program using C# and Visual Studio 2013. To provide communication, .Net Socket class is used for socket programming.
 
 
