@@ -24,3 +24,11 @@ A server computer is needed. If the game is going to be played on LAN the ip add
   <img align="left" src="https://github.com/dogaminekaba/Galactic-Greed/blob/master/screenshots/ss4.png" width="300"/>
   <img align="center" src="https://github.com/dogaminekaba/Galactic-Greed/blob/master/screenshots/ss3.png" width="300"/>
 </p>
+
+
+
+Assets are from Kenney Assets and Unity Space Shooter.
+<br/>
+http://kenney.nl/assets
+<br/>
+https://www.assetstore.unity3d.com/en/#!/content/13866
