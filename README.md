@@ -1,5 +1,5 @@
 # Galactic-Greed
--Realtime mobile multiplayer game and game server for graduation project-
+-Realtime mobile multiplayer game and game server for undergraduate project-
 
 
 ### Summary
